@@ -221,7 +221,6 @@ shinyServer(function(input, output) {
     
   })
 
-  
   #arima identification
   output$house_arima_acf <- renderPlot({
     if (is.null(input$energy_file)
@@ -236,7 +235,6 @@ shinyServer(function(input, output) {
     arima_identify(arimaData)
   })
   
-
   #arima print estimation
   output$house_arima_estimate <- renderPrint({
     if (is.null(input$energy_file)
@@ -293,54 +291,7 @@ shinyServer(function(input, output) {
     paste0("Pincode : ",levels(energyData()$Postcode)[round(input$plot_click$x)],"\nValue : ", input$plot_click$y)
   })
   
-  output$parcoord_plots <- renderPlot({
-    scale <- c(1:6)
-    uni_prob <- c( 0.16,  0.16,  0.16,  0.16, 0.16,  0.16)
-    pre_prob <-  c(0.2, .7, .1, .0, .0, .0)
-    post_prob <- c(0.0, .0, .2, .1, .4, .3)
-    N=500
-    
-    House_area <- sample(scale, N, replace = TRUE, prob = uni_prob)
-    Number_kids <- sample(scale, N, replace = TRUE, prob = uni_prob)
-    
-    pre_env_identity <- sample(scale, N, replace = TRUE, prob = pre_prob)
-    pre_ego <- sample(scale, N, replace = TRUE, prob = pre_prob)
-    pre_bio <- sample(scale, N, replace = TRUE, prob = pre_prob)
-    pre_energy <- sample(scale, N, replace = TRUE, prob = pre_prob)
-    
-    post_env_identity <- sample(scale, N, replace = TRUE, prob = post_prob)
-    post_ego <- sample(scale, N, replace = TRUE, prob = pre_prob)
-    post_bio <- sample(scale, N, replace = TRUE, prob = post_prob)
-    #post_energy <- sample(scale, 1000, replace = TRUE, prob = post_prob)
-    post_energy <- post_env_identity
-    new_data <- data.frame( 
-      "pre_energy"=pre_energy,
-      "House_area"=House_area, 
-      "Number_kids"=Number_kids, 
-      "pre_env_identity"=pre_env_identity,
-      "pre_ego"= pre_ego,
-      "pre_bio"=pre_bio,
-      "post_env_identity" = post_env_identity,
-      "post_ego" = post_ego,
-      "post_bio" = post_bio,
-      "post_energy" = post_energy
-      )
-    new_data["post_energy"] <- as.factor(new_data$post_energy)
-    levels(new_data$post_energy) <- c("Bad", "No effort", "Tried, but failed", "No real effect", "Good","Captian Planet")
-    
-    ggparcoord(new_data, scale = "globalminmax", groupColumn = 10, splineFactor = 5, title = "Dynamics of household interventions", alphaLines = 0.7 ) + 
-      scale_colour_gradient(limits=c(1, 6), low="darkred", high="springgreen")+
-      xlab("Pro Environmental dynamics") + ylab("rank") +
-      theme(
-        panel.grid.major = element_blank(),
-        #panel.grid.minor = element_blank(),
-        panel.background = element_blank(),
-        legend.text = element_text(size = 12,face = "bold")
-      )
-    
-  })  
-  
-  #Prepare data for TS models
+  #prepare data for TS models
   prepareData <- reactive({
     if (is.null(input$energy_file)&
         is.null(input$pincode) &
@@ -382,6 +333,5 @@ shinyServer(function(input, output) {
     }         
     return(energy)
   })
-  
   
 })
