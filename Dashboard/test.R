@@ -7,10 +7,9 @@ library(dygraphs)
 library(bit64)
 library(xts)
 library(forecast)
+library(depmixS4)
 
 rm(list=ls())
-
-test <- fread("D:/Nitin/ROOT/Buurkracht/Data/Final Dataset/Export/beers.csv", nrows = 0)
 
 datafile <- fread("D:/Nitin/ROOT/Buurkracht/Data/Final Dataset/Export/beers.csv", sep=";", dec=".", fill=TRUE)
 
@@ -45,6 +44,30 @@ category <- "Elektra"
   
   energyxts <-
     xts(houseWide[,-1], order.by = houseWide$Datum)
+  
+  #HMM
+  energy <- energyxts
+  k=3
+  set.seed(7)
+  #kmeans cluster
+  cl <- kmeans(coredata(energy)[,"net"], k, nstart = 25)
+  means <- as.vector(cl$centers)
+  sds <- sqrt(cl$tot.withinss / cl$size)
+  #Create HMM model
+  resp_init <- c(rbind(means,sds))
+  mod <- depmix(net~1, data=energy, nstates=k, respstart = resp_init)
+  fit.hmm <- fit(mod, verbose = F) #fit
+  probs <- posterior(fit.hmm)        
+  # Lets change the name
+  colnames(probs)[2:4] <- paste("S",1:k, sep="-")
+  # Create dta.frame
+  dfu <- cbind(datum=index(energy),net=coredata(energy)[,"net"], probs[,2:4])
+  dfm <- melt(dfu, id.vars = "datum",)
+  qplot(datum,value,data=dfm,geom="line",
+        main = "HMM",
+        ylab = "") + 
+    facet_grid(variable ~ ., scales="free_y") + theme_bw()
+  
   
   date_range <- "15min"
   if (date_range == "Day") {

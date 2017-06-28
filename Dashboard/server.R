@@ -274,22 +274,40 @@ shinyServer(function(input, output) {
     plot_arima(arimaData, date_range)
   })
   
-  output$agg_boxplot <- renderPlot({
-    if (is.null(input$energy_file))
-    {
+  output$fitHMM <- renderPrint({
+    if (is.null(input$energy_file)
+        | is.null(input$pincode) |
+        is.null(input$huisnummer)) {
       # User has not uploaded a file yet
       return(NULL)
-    }
-    
-   
+    }    
+    hmmdata <- prepareData()
+    summary(fit_hmm(hmmdata))
   })
   
-  output$agg_info_box <- renderText({
-    if (is.null(input$plot_click)) {
-      return("Please click an area of the graph to view the values")
-    }
-    paste0("Pincode : ",levels(energyData()$Postcode)[round(input$plot_click$x)],"\nValue : ", input$plot_click$y)
-  })
+  #visualise HMM
+  output$house_hmm <- renderPlot({
+    if (is.null(input$energy_file)
+        | is.null(input$pincode) |
+        is.null(input$huisnummer)) {
+      # User has not uploaded a file yet
+      return(NULL)
+    }    
+    k=4
+    hmmdata <- prepareData()
+    fm <- fit_hmm(hmmdata)
+    probs <- posterior(fm)        
+    # Lets change the name
+    colnames(probs)[2:(k+1)] <- paste("S",1:k, sep="-")
+    # Create dta.frame
+    dfu <- cbind(datum=index(hmmdata),net=coredata(hmmdata)[,"net"], probs[,2:(k+1)])
+    dfm <- melt(dfu, id.vars = "datum")
+    qplot(datum,value,data=dfm,geom="line",
+          main = "Posterior probablies of states $P(Z_t|Y_t)$",
+          ylab = "") + 
+      facet_grid(variable ~ ., scales="free_y") + theme_bw()
+  })  
+  
   
   #prepare data for TS models
   prepareData <- reactive({

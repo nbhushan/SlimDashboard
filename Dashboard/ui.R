@@ -96,9 +96,8 @@ sidebarLayout(
           tabPanel(
             "HMM",  
             tabsetPanel(
-              tabPanel("Estimation", verbatimTextOutput("hmm_estimate")),                              
-              tabPanel("Inference", dygraphOutput("house_hmm_data", width = "95%", height = "360px"),
-                       dygraphOutput("house_hmm", width = "95%", height = "360px")
+              tabPanel("Estimation", verbatimTextOutput("fitHMM")),                              
+              tabPanel("Inference", plotOutput("house_hmm", width = "95%", height = "720px")
               )))
         ))), 
     width =10)

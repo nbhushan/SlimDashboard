@@ -8,6 +8,7 @@ library(xts)
 library(shinythemes)
 library(forecast)
 library(ggfortify)
+library(depmixS4)
 
 dyCrosshair <- function(dygraph, 
                         direction = c("both", "horizontal", "vertical")) {
@@ -22,7 +23,7 @@ dyCrosshair <- function(dygraph,
 
 plot_house <- function(date_range =NULL, energy_file=NULL, weather_file=NULL, pincode, huisnummer,category, use_weather=FALSE)
 {
-  if (category == "Elektra") {
+  if(category == "Elektra") {
     energy_unit <- "kWh"
     nat_avg = 9
   } else { 
@@ -231,6 +232,21 @@ arima_identify <- function(energy){
 fit_arima <- function(energy){
   return(auto.arima(coredata(energy)[,"net"], stepwise = FALSE, trace=TRUE))
 }
+
+#fitHMM
+fit_hmm <- function(energy){
+  k=4
+  set.seed(7)
+  #kmeans cluster
+  cl <- kmeans(coredata(energy)[,"net"], k, nstart = 25)
+  means <- as.vector(cl$centers)
+  sds <- sqrt(cl$tot.withinss / cl$size)
+  #Create HMM model
+  resp_init <- c(rbind(means,sds))
+  mod <- depmix(net~1, data=energy, nstates=k, respstart = resp_init)
+  fit.hmm <- fit(mod, verbose = TRUE) #fit
+  return(fit.hmm)
+} 
 
 multiplot <- function(..., plotlist = NULL, cols) {
   require(grid)

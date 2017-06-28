@@ -1,0 +1,29 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1498654720093.000,
+    "dirty" : false,
+    "encoding" : "",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "D57D1817",
+    "lastKnownWriteTime" : 0,
+    "last_content_update" : 1498654720093,
+    "path" : null,
+    "project_path" : null,
+    "properties" : {
+        "cacheKey" : "F9640DE7",
+        "caption" : "dfu",
+        "contentUrl" : "grid_resource/gridviewer.html?env=&obj=dfu&cache_key=F9640DE7",
+        "displayedObservations" : "17280",
+        "environment" : "",
+        "object" : "dfu",
+        "preview" : "0",
+        "totalObservations" : "17280",
+        "variables" : "3"
+    },
+    "relative_order" : 5,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_dataframe"
+}

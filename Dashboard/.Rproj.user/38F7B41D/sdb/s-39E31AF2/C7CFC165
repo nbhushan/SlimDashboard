@@ -1,0 +1,20 @@
+{
+    "collab_server" : "",
+    "contents" : "#library(ggplot2) # load ggplot\nlibrary(scales)\nlibrary(data.table)\n#library(reshape2)\n#library(plyr)\nlibrary(dygraphs)\nlibrary(bit64)\nlibrary(xts)\nlibrary(forecast)\nlibrary(depmixS4)\n\nrm(list=ls())\n\ndatafile <- fread(\"D:/Nitin/ROOT/Buurkracht/Data/Final Dataset/Export/beers.csv\", sep=\";\", dec=\".\", fill=TRUE)\n\n# \n# plot_house <- function(date_range =NULL, energy_file=NULL, weather_file=NULL,\n#                        pincode, huisnummer, register, category)\n# {\ncategory <- \"Elektra\"\n\n  if (category == \"Elektra\") {\n    energy_unit <- \"kWh\"\n    nat_avg = 9\n  } else { \n    energy_unit <- \"m^3\"\n    nat_avg <- 3.835\n  }\n  \n  house <- subset(\n    datafile, Postcode == \"5437AR\" & Huisnummer == \"37\" & EnergieType == \"Elektra\" )\n  \n  house$Datum <-\n    as.POSIXct(house$Datum, format = \"%Y-%m-%d %H:%M\", \n                       tz = \"Europe/Amsterdam\")\n  \n  house <-\n    subset(house, select = c(Datum, Register, Meetwaarde))\n  house$Register <- as.factor(house$Register)\n  houseWide <- dcast(house, Datum ~ Register, value.var = \"Meetwaarde\" )\n  if (length(levels(house$Register)) > 1){\n    houseWide$`2.8.0` <- houseWide$`2.8.0`* -1 }\n  houseWide$net <- houseWide$`1.8.0`+ houseWide$`2.8.0`\n  \n  energyxts <-\n    xts(houseWide[,-1], order.by = houseWide$Datum)\n  \n  #HMM\n  energy <- energyxts\n  k=3\n  set.seed(7)\n  #kmeans cluster\n  cl <- kmeans(coredata(energy)[,\"net\"], k, nstart = 25)\n  means <- as.vector(cl$centers)\n  sds <- sqrt(cl$tot.withinss / cl$size)\n  #Create HMM model\n  resp_init <- c(rbind(means,sds))\n  mod <- depmix(net~1, data=energy, nstates=k, respstart = resp_init)\n  fit.hmm <- fit(mod, verbose = F) #fit\n  probs <- posterior(fit.hmm)        \n  # Lets change the name\n  colnames(probs)[2:4] <- paste(\"S\",1:k, sep=\"-\")\n  # Create dta.frame\n  dfu <- cbind(datum=index(energy),net=coredata(energy)[,\"net\"], probs[,2:4])\n  dfm <- melt(dfu, id.vars = \"datum\",)\n  qplot(datum,value,data=dfm,geom=\"line\",\n        main = \"HMM\",\n        ylab = \"\") + \n    facet_grid(variable ~ ., scales=\"free_y\") + theme_bw()\n  \n  \n  date_range <- \"15min\"\n  if (date_range == \"Day\") {\n    energy <- apply.daily(energyxts, FUN=mean)\n  } else if (date_range == \"Week\") {\n    energy <- apply.weekly(energyxts, FUN=mean)\n  } else if (date_range == \"Month\") {\n    energy <- apply.monthly(energyxts, FUN=mean)\n  }  else if(date_range==\"15min\"){\n    energy <- energyxts\n  }\n  \n  acf(coredata(energy)[,\"net\"])\n  ar.fit <- auto.arima(coredata(energy)[,\"net\"], stepwise = FALSE, trace=TRUE)\n  ar.res <- data.table(date = index(energy), observed = coredata(energy)[,\"net\"], fit = as.vector(fitted(ar.fit)))\n  ar.fit\n  ar.res <- as.xts.data.table(ar.res)\n  #plot  \n  dygraph(ar.res, main = paste(\"fit: \", as.character(date_range)), group = \"arima\" ) %>%\n    dyOptions(colors = RColorBrewer::brewer.pal(6, \"Set2\"))  %>%\n    #dyHighlight(highlightSeriesOpts = list(strokeWidth = 2.5)) %>%\n    dyAxis(\"x\", drawGrid = T) %>%\n    dyAxis(\n      \"y\",axisLineWidth = 0.01,drawGrid = T ) %>%\n    dyOptions(includeZero = TRUE) \n  \n  \n  \n  \npo",
+    "created" : 1498653683425.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "3624493703",
+    "id" : "C7CFC165",
+    "lastKnownWriteTime" : 1498655262,
+    "last_content_update" : 1498655262811,
+    "path" : "D:/Nitin/ROOT/Buurkracht/Dashboard/Git/slimDashboard/Dashboard/test.R",
+    "project_path" : "test.R",
+    "properties" : {
+    },
+    "relative_order" : 4,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}
