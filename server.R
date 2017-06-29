@@ -2,8 +2,7 @@ options(shiny.maxRequestSize=1024*1024^2)
 
 
 library(shiny)
-library(ggplot2) # load ggplot
-library(GGally)
+library(ggplot2) 
 library(scales)
 library(data.table)
 library(bit64)
