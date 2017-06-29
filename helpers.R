@@ -1,11 +1,8 @@
 library(shiny)
 library(ggplot2) # load ggplot
 library(scales)
-library(reshape2)
-library(plyr)
 library(dygraphs)
 library(xts)
-library(shinythemes)
 library(forecast)
 library(ggfortify)
 library(depmixS4)
