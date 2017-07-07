@@ -231,17 +231,16 @@ fit_arima <- function(energy){
 }
 
 #fitHMM
-fit_hmm <- function(energy){
-  k=4
+fit_hmm <- function(energy, k){
   set.seed(7)
   #kmeans cluster
-  cl <- kmeans(coredata(energy)[,"net"], k, nstart = 25)
+  cl <- kmeans(coredata(energy)[,"net"], k, nstart = 50)
   means <- as.vector(cl$centers)
   sds <- sqrt(cl$tot.withinss / cl$size)
   #Create HMM model
   resp_init <- c(rbind(means,sds))
   mod <- depmix(net~1, data=energy, nstates=k, respstart = resp_init)
-  fit.hmm <- fit(mod, verbose = TRUE) #fit
+  fit.hmm <- fit(mod, verbose = FALSE) #fit
   return(fit.hmm)
 } 
 

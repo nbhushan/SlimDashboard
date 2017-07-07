@@ -9,7 +9,7 @@ library(shinythemes)
 
 shinyUI(fluidPage(theme = shinytheme("cosmo"),
   titlePanel(
-  "Buurkracht exploratory data analysis"
+  "slimDashboard"
 ),
 
 sidebarLayout(
@@ -48,6 +48,17 @@ sidebarLayout(
     radioButtons("radio", label = "Sampling frequency",
                  choices = list("15min", "Day", "Week", "Month"), 
                  selected = "15min"),    
+    
+    # Copy the line below to make a set of select inputs
+    selectInput("k", label = "Number of HMM states",
+                 choices = list(2,3,4,5), 
+                 selected = 3),  
+    # Copy the line below to make a checkbox
+    selectInput("hmm_covariate", label = "Covariates on dynamics", 
+    choices = list("none", "temperature", "affect", "psychological determinants"), 
+                selected = "none"),  
+    # Copy the line below to make a checkbox
+    checkboxInput("hmm_random", label = "Random effects", value = FALSE), 
     width =2 ),
   
   

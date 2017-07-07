@@ -281,7 +281,8 @@ shinyServer(function(input, output) {
       return(NULL)
     }    
     hmmdata <- prepareData()
-    summary(fit_hmm(hmmdata))
+    k <- as.numeric(input$k[1])
+    summary(fit_hmm(hmmdata,k))
   })
   
   #visualise HMM
@@ -292,9 +293,9 @@ shinyServer(function(input, output) {
       # User has not uploaded a file yet
       return(NULL)
     }    
-    k=4
+    k=as.numeric(input$k[1])
     hmmdata <- prepareData()
-    fm <- fit_hmm(hmmdata)
+    fm <- fit_hmm(hmmdata, k)
     probs <- posterior(fm)        
     # Lets change the name
     colnames(probs)[2:(k+1)] <- paste("S",1:k, sep="-")
