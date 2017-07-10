@@ -352,4 +352,12 @@ shinyServer(function(input, output) {
     return(energy)
   })
   
+  function(input, output, session) {
+    
+    session$onSessionEnded(function() {
+      stopApp()
+      q("no")
+    })
+  }
+  
 })
