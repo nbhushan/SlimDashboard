@@ -66,6 +66,7 @@ sidebarLayout(
     tags$style(
       type = "text/css",
       ".shiny-output-error { visibility: hidden; }",
+      ".span8 .well { background-color: #00FFFF; }",
       ".shiny-output-error:before { visibility: hidden; }"
     ),
     tabsetPanel(

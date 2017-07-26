@@ -300,11 +300,9 @@ shinyServer(function(input, output) {
     # Lets change the name
     colnames(probs)[2:(k+1)] <- paste("S",1:k, sep="-")
     # Create dta.frame
-    dfu <- cbind(datum=index(hmmdata),net=coredata(hmmdata)[,"net"], probs[,2:(k+1)])
-    dfm <- melt(dfu, id.vars = "datum")
-    qplot(datum,value,data=dfm,geom="line",
-          main = "Posterior probablies of states $P(Z_t|Y_t)$",
-          ylab = "") + 
+    dfu <- data.table(cbind(datum=index(hmmdata),net=coredata(hmmdata)[,"net"], probs[,2:(k+1)]))
+    dfm <- melt(dfu[1:100], id.vars = "datum",)
+    ggplot(dfm,aes(datum,value)) + geom_line()+ 
       facet_grid(variable ~ ., scales="free_y") + theme_bw()
   })  
   
@@ -337,8 +335,7 @@ shinyServer(function(input, output) {
       houseWide$net <- houseWide$`1.8.0`
     }
     
-    energyxts <-
-      xts(houseWide[,-1], order.by = houseWide$Datum)
+    energyxts <- as.xts.data.table(houseWide)
     
     if (date_range == "Day") {
       energy <- apply.daily(energyxts, FUN=mean)

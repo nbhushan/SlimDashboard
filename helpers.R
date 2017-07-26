@@ -227,7 +227,7 @@ arima_identify <- function(energy){
 }
 
 fit_arima <- function(energy){
-  return(auto.arima(coredata(energy)[,"net"], stepwise = FALSE, trace=TRUE))
+  return(auto.arima(coredata(energy)[,"net"], stepwise = FALSE, trace=FALSE))
 }
 
 #fitHMM

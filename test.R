@@ -1,22 +1,15 @@
-#library(ggplot2) # load ggplot
 library(scales)
-library(data.table)
-#library(reshape2)
-#library(plyr)
 library(dygraphs)
 library(bit64)
 library(xts)
 library(forecast)
 library(depmixS4)
+library(data.table)
 
 rm(list=ls())
 
-datafile <- fread("D:/Nitin/ROOT/Buurkracht/Data/Final Dataset/Export/beers.csv", sep=";", dec=".", fill=TRUE)
+datafile <- fread("D:/Nitin/ROOT/Buurkracht/Data/Final Dataset/Export/afferden.csv", sep=";", dec=".")
 
-# 
-# plot_house <- function(date_range =NULL, energy_file=NULL, weather_file=NULL,
-#                        pincode, huisnummer, register, category)
-# {
 category <- "Elektra"
 
   if (category == "Elektra") {
@@ -28,7 +21,7 @@ category <- "Elektra"
   }
   
   house <- subset(
-    datafile, Postcode == "5437AR" & Huisnummer == "37" & EnergieType == "Elektra" )
+    datafile, Postcode == "5851AD" & Huisnummer == "11" & EnergieType == "Elektra" )
   
   house$Datum <-
     as.POSIXct(house$Datum, format = "%Y-%m-%d %H:%M", 
@@ -42,8 +35,7 @@ category <- "Elektra"
     houseWide$`2.8.0` <- houseWide$`2.8.0`* -1 }
   houseWide$net <- houseWide$`1.8.0`+ houseWide$`2.8.0`
   
-  energyxts <-
-    xts(houseWide[,-1], order.by = houseWide$Datum)
+  energyxts <- as.xts.data.table(houseWide)
   
   #HMM
   energy <- energyxts
@@ -59,10 +51,12 @@ category <- "Elektra"
   fit.hmm <- fit(mod, verbose = F) #fit
   probs <- posterior(fit.hmm)        
   # Lets change the name
-  colnames(probs)[2:4] <- paste("S",1:k, sep="-")
+  colnames(probs)[2:(k+1)] <- paste("S",1:k, sep="-")
   # Create dta.frame
-  dfu <- cbind(datum=index(energy),net=coredata(energy)[,"net"], probs[,2:4])
-  dfm <- melt(dfu, id.vars = "datum",)
+  dfu <- data.table(cbind(datum=index(energy),net=coredata(energy)[,"net"], probs[,2:(k+1)]))
+  dfm <- as.xts.data.table(dfu)
+  dygraph(dfm)
+  dfm <- melt(dfu[1:100], id.vars = "datum",)
   qplot(datum,value,data=dfm,geom="line",
         main = "HMM",
         ylab = "") + 
