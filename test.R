@@ -5,10 +5,18 @@ library(xts)
 library(forecast)
 library(depmixS4)
 library(data.table)
+require(reshape2)
+require(tidyr)
+require(tsbox)
+library(lubridate)
+source("helpers.R")
 
 rm(list=ls())
 
-datafile <- fread("D:/Nitin/ROOT/Buurkracht/Data/Final Dataset/Export/afferden.csv", sep=";", dec=".")
+datafile <- fread("D:\\Nitin\\ROOT/Buurkracht/Data/FinalFinalDATA/AnonymizedMemBerData/ lazoh .csv", sep=";", dec=".")
+
+#https://stackoverflow.com/questions/8161836/how-do-i-replace-na-values-with-zeros-in-an-r-dataframe
+for (j in names(datafile)) set(datafile,which(is.nan(datafile[[j]])),j,0) 
 
 category <- "Elektra"
 
@@ -21,21 +29,106 @@ category <- "Elektra"
   }
   
   house <- subset(
-    datafile, Postcode == "5851AD" & Huisnummer == "11" & EnergieType == "Elektra" )
+    datafile, EAN = "0e9adaec9f132d7d5418e6a3066ff0ee" & EnergieType == "Elektra" )
   
+  
+  #"2017-06-28T00:00:00Z"
   house$Datum <-
-    as.POSIXct(house$Datum, format = "%Y-%m-%d %H:%M", 
-                       tz = "Europe/Amsterdam")
-  
+    as.POSIXct(house$Datum, format="%Y-%m-%dT%H:%M:%SZ", 
+                                    tz = "Europe/Amsterdam")
+  house <- na.omit(house, cols="Datum", invert=FALSE)
   house <-
     subset(house, select = c(Datum, Register, Meetwaarde))
+  
   house$Register <- as.factor(house$Register)
-  houseWide <- dcast(house, Datum ~ Register, value.var = "Meetwaarde" )
+  houseWide <- dcast(house, Datum ~ Register, value.var = "Meetwaarde", fun.aggregate = mean )
+  houseWide$`2.8.0` <- replace(houseWide$`2.8.0`, is.na(houseWide$`2.8.0`), 0)
+  
   if (length(levels(house$Register)) > 1){
     houseWide$`2.8.0` <- houseWide$`2.8.0`* -1 }
-  houseWide$net <- houseWide$`1.8.0`+ houseWide$`2.8.0`
   
-  energyxts <- as.xts.data.table(houseWide)
+  energyxts <-
+    xts(houseWide[,-1], order.by = houseWide$Datum)
+  
+  date_range = "Monthly"
+  
+  if (date_range == "Daily") {
+    energy <- apply.daily(energyxts, FUN=colSums)
+    frequency = 7
+    seasonal.periods=c(7, 365.25)
+  }  else if (date_range == "Hourly") {
+    energy <- period.apply(energyxts, endpoints(energyxts, "hours"), colSums)
+    frequency = 24*365
+    seasonal.periods=c(24,168,8766)
+  }  else if (date_range == "Monthly") {
+    energy <- apply.monthly(energyxts, FUN=colSums)
+    frequency = 12
+    seasonal.periods=c(12)
+  }  else if(date_range=="15min"){
+    energy <- energyxts
+    frequency = 60/15*24*365
+    seasonal.periods=c(96,336, 70128)
+  }
+  
+
+  arima.xts <- energy[,1]-energy[,2]
+  
+  start.year <- year(start(arima.xts)) 
+  start.month <- month(start(arima.xts)) 
+  end.year <- year(end(arima.xts)) 
+  end.month <- month(end(arima.xts)) 
+  start.ts <- c(start.year, start.month)
+  end.ts <- c(end.year, end.month)
+  
+  arima.ts <- ts(coredata(arima.xts), 
+                 start = start.ts,
+                 end = end.ts,
+                 frequency = frequency
+                 )
+  
+  arima.msts <- msts(coredata(arima.xts), 
+                     start = start.ts,
+                     end = end.ts,
+                     seasonal.periods =  seasonal.periods)
+  
+  #arima.ts <- ts_timeSeries(arima.xts)
+  arima.fit <- auto.arima(arima.msts,stepwise=FALSE, approximation = FALSE)
+  arima.tbats <- tbats(arima.msts)
+  arima.forecast <- forecast(arima.tbats, level = c(95), h = 32 )
+  all <- cbind(actual = arima.tbats, 
+               lwr = arima.forecast$lower,
+               upr = arima.forecast$upper,
+               pred = arima.forecast$mean)
+  t <- as.POSIXct(format(date_decimal(as.vector(time(all))), "%Y-%m-%d %H:%M:%S"))
+  all.xts <- xts(data.table(all), order.by = t)
+
+  dygraph(all.xts, "Energy consumption") %>%
+    dySeries("actual", label = "Actual") %>%
+    dySeries(c("lwr", "pred", "upr"), label = "Predicted")
+
+  
+
+
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   
   #HMM
   energy <- energyxts

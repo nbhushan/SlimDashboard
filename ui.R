@@ -5,9 +5,9 @@ library(plyr)
 library(dygraphs)
 library(xts)
 library(shinythemes)
+library(shinycssloaders)
 
-
-shinyUI(fluidPage(theme = shinytheme("cosmo"),
+shinyUI(fluidPage(theme = shinytheme("flatly"),
   titlePanel(
   "slimDashboard"
 ),
@@ -37,29 +37,29 @@ sidebarLayout(
     #                  '.csv')
     #     ),
 
-    uiOutput('postalCode'),
-    uiOutput('houseNumber'),
+    uiOutput('EAN'),
     uiOutput('category'),
     tags$hr(),
-    # Copy the line below to make a checkbox
-    checkboxInput("post_checkbox", label = "Group Postcodes", value = FALSE),    
+
     
-    # Copy the line below to make a set of radio buttons
-    radioButtons("radio", label = "Sampling frequency",
-                 choices = list("15min", "Day", "Week", "Month"), 
-                 selected = "15min"),    
-    
-    # Copy the line below to make a set of select inputs
-    selectInput("k", label = "Number of HMM states",
-                 choices = list(2,3,4,5), 
-                 selected = 3),  
-    # Copy the line below to make a checkbox
-    selectInput("hmm_covariate", label = "Covariates on dynamics", 
-    choices = list("none", "temperature", "affect", "psychological determinants"), 
-                selected = "none"),  
-    # Copy the line below to make a checkbox
-    checkboxInput("hmm_random", label = "Random effects", value = FALSE), 
-    width =2 ),
+    # Sampling frequency
+    radioButtons("radio", label = "Aggregate data",
+                 choices = list("15min", "Hourly", "Daily", "Monthly"), 
+                 selected = "Daily"),    
+
+    # # Copy the line below to make a set of select inputs
+    # selectInput("k", label = "Number of HMM states",
+    #              choices = list(2,3,4,5), 
+    #              selected = 3),  
+    # # Copy the line below to make a checkbox
+    # selectInput("hmm_covariate", label = "Covariates on dynamics", 
+    # choices = list("none", "temperature", "affect", "psychological determinants"), 
+    #             selected = "none"),  
+    # # Copy the line below to make a checkbox
+    # checkboxInput("hmm_random", label = "Random effects", value = FALSE), 
+    # #Download button
+   # downloadButton('downloadData', 'Download'),
+    width =2),
   
   
   mainPanel(
@@ -70,46 +70,46 @@ sidebarLayout(
       ".shiny-output-error:before { visibility: hidden; }"
     ),
     tabsetPanel(
-      tabPanel("Household",
+      tabPanel("Visualize",
                tabsetPanel(
                  tabPanel(
-                   "Time series",  dygraphOutput("dygraph", width = "95%", height = "720px")
+                   "Time series",  dygraphOutput("dygraph", width = "95%", height = "720px")%>% withSpinner(color="#000000")
                  ),
                tabPanel(
-                 "Boxplots",  plotOutput("dygraph_house_box", width = "95%", height = "720px")
+                 "Distributions",  plotOutput("dygraph_house_box", width = "95%", height = "720px")%>% withSpinner(color="#000000")
                ))),
+      # tabPanel(
+      #   "Neighbourhood", 
+      #   tabsetPanel(
+      #     tabPanel("Seasonal",dygraphOutput("pin_dygraph", width = "95%", height = "720px")),
+      #     tabPanel(
+      #       "Boxplots",  plotOutput("pin_boxplot", width = "95%",height = "720px")
+      #     ))),
       tabPanel(
-        "Neighbourhood", 
-        tabsetPanel(
-          tabPanel("Seasonal",dygraphOutput("pin_dygraph", width = "95%", height = "720px")),
-          tabPanel(
-            "Boxplots",  plotOutput("pin_boxplot", width = "95%",height = "720px")
-          ))),
-      tabPanel(
-        "Models",
+        "Model",
         tabsetPanel(
           tabPanel(
             "Arima",  
             tabsetPanel(
               tabPanel(
-                "Identification",plotOutput("house_arima_acf", width = "95%", height = "720px")
+                "Identification",plotOutput("house_arima_acf", width = "95%", height = "720px")%>% withSpinner(color="#000000")
               ),   
               tabPanel(
-                "Estimation", verbatimTextOutput("house_arima_estimate")
+                "Estimation", verbatimTextOutput("house_arima_estimate")%>% withSpinner(color="#000000")
               ), 
               tabPanel(
-                "Fit",
-                dygraphOutput("house_arima", width = "95%", height = "720px")
+                "Forecast",
+                dygraphOutput("house_arima", width = "95%", height = "720px")%>% withSpinner(color="#000000")
               ),
               tabPanel(
-                "Diagnostics",plotOutput("house_arima_tsdiag", width = "95%", height = "720px")
+                "Diagnostics",plotOutput("house_arima_tsdiag", width = "95%", height = "720px")%>% withSpinner(color="#000000")
               )
             )),
           tabPanel(
             "HMM",  
             tabsetPanel(
-              tabPanel("Estimation", verbatimTextOutput("fitHMM")),                              
-              tabPanel("Inference", plotOutput("house_hmm", width = "95%", height = "720px")
+              tabPanel("Estimation", verbatimTextOutput("fitHMM")%>% withSpinner(color="#000000")),                              
+              tabPanel("Inference", plotOutput("house_hmm", width = "95%", height = "720px")%>% withSpinner(color="#000000")
               )))
         ))), 
     width =10)

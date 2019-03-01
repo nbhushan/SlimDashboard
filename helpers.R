@@ -6,6 +6,8 @@ library(xts)
 library(forecast)
 library(ggfortify)
 library(depmixS4)
+require(wesanderson)
+require(lubridate)
 
 dyCrosshair <- function(dygraph, 
                         direction = c("both", "horizontal", "vertical")) {
@@ -18,199 +20,194 @@ dyCrosshair <- function(dygraph,
   )
 }
 
-plot_house <- function(date_range =NULL, energy_file=NULL, weather_file=NULL, pincode, huisnummer,category, use_weather=FALSE)
+plot_house <- function(date_range =NULL, energy_file=NULL, weather_file=NULL, EAN,category, use_weather=FALSE)
 {
   if(category == "Elektra") {
     energy_unit <- "kWh"
-    nat_avg = 9
   } else { 
     energy_unit <- "m^3"
-    nat_avg <- 3.835
   }
   
   house <- subset(
-    energy_file, Postcode == pincode &
-      Huisnummer == huisnummer &
+    energy_file, EAN == EAN &
       EnergieType == category )
   
-  house$Datum <- as.POSIXct(house$Datum, format = "%Y-%m-%d %H:%M", 
-                       tz = "Europe/Amsterdam")
+  house$Datum <- as.POSIXct(house$Datum, format="%Y-%m-%dT%H:%M:%SZ", 
+                            tz = "Europe/Amsterdam")
   house <-
     subset(house, select = c(Datum, Register, Meetwaarde))
   house$Register <- as.factor(house$Register)
-  houseWide <- dcast(house, Datum ~ Register, value.var = "Meetwaarde" )
-  if (length(levels(house$Register)) > 1){
-  houseWide$`2.8.0` <- houseWide$`2.8.0`* -1 }
+  houseWide <- dcast(house, Datum ~ Register, value.var = "Meetwaarde", fun.aggregate = mean )
+
   energyxts <-
     xts(houseWide[,-1], order.by = houseWide$Datum)
   
-    if (date_range == "Day") {
-      energy <- apply.daily(energyxts, FUN=mean)
-    }
-    else if (date_range == "Week") {
-      energy <- apply.weekly(energyxts, FUN=mean)
-    }
-    else if (date_range == "Month") {
-      energy <- apply.monthly(energyxts, FUN=mean)
-    }
-    else if(date_range=="15min"){
+    if (date_range == "Daily") {
+      energy <- apply.daily(energyxts, FUN=colSums)
+    }    else if (date_range == "Hourly") {
+      energy <- period.apply(energyxts, endpoints(energyxts, "hours"), colSums)
+    }    else if (date_range == "Monthly") {
+      energy <- apply.monthly(energyxts, FUN=colSums)
+    }    else if(date_range=="15min"){
       energy <- energyxts
     }
-    
-    dygraph(energy, main = paste(
-      "Energy consumption per Household : ", as.character(category)
-    )) %>%
-      dyLimit(
-        nat_avg, label = "National Mean", labelLoc = "right",
-        color = "grey", strokePattern = "dashed"
-      ) %>%
-      dyOptions(colors = RColorBrewer::brewer.pal(3, "Set2"))  %>%
-      dyLegend(width = 400) %>%
-      dyHighlight(highlightSeriesOpts = list(strokeWidth = 1.5)) %>%
+  agg.xts <- energy[, 1] - energy[, 2]
+  colnames(agg.xts) <- "meetwaarde"
+  
+    dygraph(agg.xts) %>%
+      dyOptions(colors = wes_palette("Darjeeling1"))  %>%
+      dyLegend(width = 250) %>%
+      dyLimit("0") %>%
+      #dyHighlight(highlightSeriesOpts = list(strokeWidth = 1.2)) %>%
       dyAxis("x", drawGrid = FALSE) %>%
       dyAxis(
-        "y", axisLineWidth = 0.01,drawGrid = FALSE, label = energy_unit
+        "y", axisLineWidth = 0.01,drawGrid = TRUE, label = energy_unit
       ) %>%
-      dyOptions(includeZero = TRUE)  %>%
+      dyOptions(includeZero = TRUE, gridLineColor = "lightgray",gridLineWidth=0.1)  %>%
       dyRangeSelector()  
   }
 
-plot_house_box <- function(energy_file=NULL, weather_file=NULL, pincode, huisnummer, register, category, use_weather=FALSE)
-{
- 
-  if (category == "Elektra") {
-    energy_unit <- "kWh"
-    nat_avg = 9
-  } else { 
-    energy_unit <- "m^3"
-    nat_avg <- 3.835
-  }
-  
-  house <- subset(
-    energy_file, Postcode == pincode &
-      Huisnummer == huisnummer &
-      EnergieType == category & Register == register
-  )
+# plot_house_box <- function(energy_file=NULL, weather_file=NULL, EAN, register, category, use_weather=FALSE)
+# {
+#  
+#   if (category == "Elektra") {
+#     energy_unit <- "kWh"
+#     nat_avg = 9
+#   } else { 
+#     energy_unit <- "m^3"
+#     nat_avg <- 3.835
+#   }
+#   
+#   house <- subset(
+#     energy_file,EAN == EAN &
+#       EnergieType == category & Register == register
+#   )
+# 
+#   house <- subset(house, select = c(Datum, EnergieType, Meetwaarde))
+#   house$EnergieType <- as.factor(house$EnergieType)
+#   house$Datum <- as.POSIXct(house$Datum, format="%Y-%m-%dT%H:%M:%SZ", 
+#                             tz = "Europe/Amsterdam")
+#   
+#   
+#   ggplot(house) + 
+#     geom_boxplot(aes_string(y=Meetwaarde, x=reorder(format(house$Datum, '%b-%Y'), house$Datum), 
+#                      fill = EnergieType)) + ylab(energy_unit) +
+#     labs(title  = "Energy consumption boxplot") +
+#     theme(
+#       axis.text.x = element_text(
+#         angle = 90, vjust = 0.5, hjust = 1
+#       ),
+#       panel.grid.major = element_blank(),
+#       panel.grid.minor = element_blank(),
+#       panel.background = element_blank(),
+#       legend.text = element_text(size = 15,face = "bold")
+#     )
+# 
+# 
+# }
+# 
+# plot_pincode <- function(date_range =NULL, energy_file=NULL, weather_file=NULL,  category, use_weather=FALSE)
+# {
+#   if (category == "Elektra") {
+#     energy_unit <- "kWh"
+#     nat_avg = 9
+#   } else { 
+#     energy_unit <- "m^3"
+#     nat_avg <- 3.835
+#   }
+#   
+#   house <- subset(
+#     energy_file,  EnergieType == category )
+#   
+#   house$Datum <-
+#     as.POSIXct(house$Datum, format = "%Y-%m-%d %H:%M", 
+#                tz = "Europe/Amsterdam")
+#   
+#   house <-
+#     subset(house, select = c(Datum, EAN, Register, Meetwaarde))
+#   house$Register <- as.factor(house$Register)
+#   house$Huisnummer <- as.factor(house$EAN)
+#   
+#   if(category=="Gas"){
+#     house$Meetwaarde[house$EnergieType == "Gas"] <-
+#       house$Meetwaarde[house$EnergieType == "Gas"] * 9.769}
+#   if (length(levels(house$Register)) > 1){
+#     house$Meetwaarde[house$Register == "2.8.0"] <-
+#       house$Meetwaarde[house$Register == "2.8.0"] * -1}  
+#   
+#   houseWide <- dcast(house, Datum ~ Huisnummer+Register, value.var = "Meetwaarde" )
+#   colnames(houseWide) <- c("Datum", "from grid", "to grid")
+#   energyxts <-
+#     xts(houseWide[,-1], order.by = houseWide$Datum)
+#   
+# 
+#     if (date_range == "Day") {
+#       energy <- apply.daily(energyxts, FUN=mean)
+#     }
+#     else if (date_range == "Week") {
+#       energy <- apply.weekly(energyxts, FUN=mean)
+#     }
+#     else if (date_range == "Month") {
+#       energy <- apply.monthly(energyxts, FUN=mean)
+#     }
+#     else if(date_range=="15min"){
+#       energy <- energyxts
+#     }
+#     
+#     dygraph(energy, main = paste(
+#       "Energy consumption: ", as.character(category)
+#     )) %>%
+#       dyLimit(
+#         nat_avg, label = "National Mean", labelLoc = "right",
+#         color = "grey", strokePattern = "dashed"
+#       ) %>%
+#       dyOptions(colors = RColorBrewer::brewer.pal(3, "Set2"))  %>%
+#       dyLegend(width = 400) %>%
+#       dyHighlight(highlightSeriesOpts = list(strokeWidth = 1.5)) %>%
+#       dyAxis("x", drawGrid = FALSE) %>%
+#       dyAxis(
+#         "y", axisLineWidth = 0.01,drawGrid = FALSE, label = energy_unit
+#       ) %>%
+#       dyOptions(includeZero = TRUE)  %>%
+#       dyRangeSelector()  
+#   }
 
-  house <- subset(house, select = c(Datum, EnergieType, Meetwaarde))
-  house$EnergieType <- as.factor(house$EnergieType)
+plot_arima <- function(arima.ts, date_range)
+{
+  #acf(coredata(energy)[,"net"])
+  ar.fit <- fit_arima(arima.ts)
+  #arima.ts <- ts_timeSeries(arima.xts)
+  arima.forecast <- forecast(ar.fit, level = c(95), h = 12 )
+  all <- cbind(actual = arima.ts, 
+               lwr = arima.forecast$lower,
+               upr = arima.forecast$upper,
+               pred = arima.forecast$mean)
+  t <- as.POSIXct(format(date_decimal(as.vector(time(all))), "%Y-%m-%d %H:%M:%S"))
+  all.xts <- xts(data.table(all), order.by = t)
   
-  ggplot(house) + 
-    geom_boxplot(aes_string(y=Meetwaarde, x=reorder(format(house$Datum, '%b-%Y'), house$Datum), 
-                     fill = EnergieType)) + ylab(energy_unit) +
-    labs(title  = "Energy consumption boxplot") +
-    theme(
-      axis.text.x = element_text(
-        angle = 90, vjust = 0.5, hjust = 1
-      ),
-      panel.grid.major = element_blank(),
-      panel.grid.minor = element_blank(),
-      panel.background = element_blank(),
-      legend.text = element_text(size = 15,face = "bold")
+  dygraph(all.xts) %>%
+    dySeries("actual", label = "Actual") %>%
+    dySeries(c("lwr", "pred", "upr"), label = "Predicted") %>%
+    dyAxis("y", axisLineWidth = 0.01,drawGrid = TRUE, label = "kWh"
     )
-
-
 }
 
-plot_pincode <- function(date_range =NULL, energy_file=NULL, weather_file=NULL, pincode, category, use_weather=FALSE)
-{
-  if (category == "Elektra") {
-    energy_unit <- "kWh"
-    nat_avg = 9
-  } else { 
-    energy_unit <- "m^3"
-    nat_avg <- 3.835
-  }
-  
-  house <- subset(
-    energy_file, Postcode == pincode &
-      EnergieType == category )
-  
-  house$Datum <-
-    as.POSIXct(house$Datum, format = "%Y-%m-%d %H:%M", 
-               tz = "Europe/Amsterdam")
-  
-  house <-
-    subset(house, select = c(Datum, Huisnummer, Register, Meetwaarde))
-  house$Register <- as.factor(house$Register)
-  house$Huisnummer <- as.factor(house$Huisnummer)
-  
-  if(category=="Gas"){
-    house$Meetwaarde[house$EnergieType == "Gas"] <-
-      house$Meetwaarde[house$EnergieType == "Gas"] * 9.769}
-  if (length(levels(house$Register)) > 1){
-    house$Meetwaarde[house$Register == "2.8.0"] <-
-      house$Meetwaarde[house$Register == "2.8.0"] * -1}  
-  
-  houseWide <- dcast(house, Datum ~ Huisnummer+Register, value.var = "Meetwaarde" )
-  
-  energyxts <-
-    xts(houseWide[,-1], order.by = houseWide$Datum)
-  
-
-    if (date_range == "Day") {
-      energy <- apply.daily(energyxts, FUN=mean)
-    }
-    else if (date_range == "Week") {
-      energy <- apply.weekly(energyxts, FUN=mean)
-    }
-    else if (date_range == "Month") {
-      energy <- apply.monthly(energyxts, FUN=mean)
-    }
-    else if(date_range=="15min"){
-      energy <- energyxts
-    }
-    
-    dygraph(energy, main = paste(
-      "Energy consumption per pincode : ", as.character(category)
-    )) %>%
-      dyLimit(
-        nat_avg, label = "National Mean", labelLoc = "right",
-        color = "grey", strokePattern = "dashed"
-      ) %>%
-      dyOptions(colors = RColorBrewer::brewer.pal(3, "Set2"))  %>%
-      dyLegend(width = 400) %>%
-      dyHighlight(highlightSeriesOpts = list(strokeWidth = 1.5)) %>%
-      dyAxis("x", drawGrid = FALSE) %>%
-      dyAxis(
-        "y", axisLineWidth = 0.01,drawGrid = FALSE, label = energy_unit
-      ) %>%
-      dyOptions(includeZero = TRUE)  %>%
-      dyRangeSelector()  
-  }
-
-plot_arima <- function(energy, date_range)
+plot_arima_diag <- function(arima.ts, date_range)
 {
   #acf(coredata(energy)[,"net"])
-  ar.fit <- fit_arima(energy)
-  ar.res <- data.table(date = index(energy), observed = coredata(energy)[,"net"], fit = as.vector(fitted(ar.fit)))
-  #ar.fit
-  ar.res <- as.xts.data.table(ar.res)
-  #plot  
-  dygraph(ar.res, main = paste("fit: ", as.character(date_range)), group = "arima" ) %>%
-    dyOptions(colors = RColorBrewer::brewer.pal(6, "Set2"))  %>%
-    #dyHighlight(highlightSeriesOpts = list(strokeWidth = 2.5)) %>%
-    dyAxis("x", drawGrid = T) %>%
-    dyAxis(
-      "y",axisLineWidth = 0.01,drawGrid = T ) %>%
-    dyOptions(includeZero = TRUE) 
-}
-
-plot_arima_diag <- function(energy, date_range)
-{
-  #acf(coredata(energy)[,"net"])
-  ar.fit <- fit_arima(energy)
-  ar.res <- data.table(date = index(energy),resid = as.vector(residuals(ar.fit)))
-  #ar.fit
-  ar.res <- as.xts.data.table(ar.res)
-  #plot  
-  dygraph(ar.res, main = paste("residuals: ", as.character(date_range)), group = "arima" ) %>%
-    dyOptions(colors = RColorBrewer::brewer.pal(6, "Set2"))  %>%
-    #dyHighlight(highlightSeriesOpts = list(strokeWidth = 2.5)) %>%
-    dyAxis("x", drawGrid = T) %>%
-    dyAxis(
-      "y",axisLineWidth = 0.01,drawGrid = T ) %>%
-    dyOptions(includeZero = TRUE) 
+  ar.fit <- fit_arima(arima.ts)
+  #arima.ts <- ts_timeSeries(arima.xts)
+  arima.forecast <- forecast(ar.fit, level = c(95), h = 12 )
+  all <- cbind(actual = arima.ts, 
+               lwr = arima.forecast$lower,
+               upr = arima.forecast$upper,
+               pred = arima.forecast$mean)
+  t <- as.POSIXct(format(date_decimal(as.vector(time(all))), "%Y-%m-%d %H:%M:%S"))
+  all.xts <- xts(data.table(all), order.by = t)
+  
+  dygraph(all.xts, "Energy consumption") %>%
+    dySeries("actual", label = "Actual") %>%
+    dySeries(c("lwr", "pred", "upr"), label = "Predicted")
 }
 
 plot_arima_tsdiag <- function(energy)
@@ -221,20 +218,20 @@ plot_arima_tsdiag <- function(energy)
 }
 
 arima_identify <- function(energy){
-  p1 <- autoplot(acf(coredata(energy)[,"net"], plot = FALSE))
-  p2 <- autoplot(pacf(coredata(energy)[,"net"], plot = FALSE), ylab = "PACF")
+  p1 <- autoplot(acf(energy, plot = FALSE))
+  p2 <- autoplot(pacf(energy, plot = FALSE), ylab = "PACF")
   multiplot(p1, p2, cols=1)
 }
 
 fit_arima <- function(energy){
-  return(auto.arima(coredata(energy)[,"net"], stepwise = FALSE, trace=FALSE))
+  return(auto.arima(energy,stepwise=FALSE, approximation=FALSE,D=1))
 }
 
 #fitHMM
 fit_hmm <- function(energy, k){
   set.seed(7)
   #kmeans cluster
-  cl <- kmeans(coredata(energy)[,"net"], k, nstart = 50)
+  cl <- kmeans(coredata(energy), k, nstart = 50)
   means <- as.vector(cl$centers)
   sds <- sqrt(cl$tot.withinss / cl$size)
   #Create HMM model
