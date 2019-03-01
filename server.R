@@ -1,6 +1,10 @@
 options(shiny.maxRequestSize = 1024 * 1024 ^ 2)
 
 
+# TABLE OF CONTENTS
+# 0. Prepare environment
+
+# 0. Prepare environment ----
 library(shiny)
 library(ggplot2)
 library(scales)
@@ -182,7 +186,7 @@ shinyServer(function(input, output) {
     ggplot(house.df.long, aes(y = value, x = X,
                               fill = variable)) +
       #geom_violin(trim=FALSE) +
-      ylab("kWh") +  xlab("") + geom_boxplot(width=0.1)+
+      ylab("kWh") +  xlab("") + geom_boxplot(outlier.shape = NA) +
       facet_grid(variable ~ ., scales =
                    "free_y") +
       scale_fill_manual(values = wes_palette("Darjeeling1")) +
@@ -191,8 +195,8 @@ shinyServer(function(input, output) {
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
         panel.background = element_blank(),
-        legend.text      = element_text(size=15),
-        legend.position="top"
+        legend.text      = element_text(size = 15),
+        legend.position = "top"
       )
   })
   
@@ -265,7 +269,7 @@ shinyServer(function(input, output) {
     }
     
     #ARIMA
-    arimaData <- prepareData()
+    arimaData <- prepareData()$data.ts
     arima_identify(arimaData)
   })
   
@@ -277,7 +281,7 @@ shinyServer(function(input, output) {
       # User has not uploaded a file yet
       return(NULL)
     }
-    arimaData <- prepareData()
+    arimaData <- prepareData()$data.ts
     summary(fit_arima(arimaData))
   })
   
@@ -289,7 +293,7 @@ shinyServer(function(input, output) {
       # User has not uploaded a file yet
       return(NULL)
     }
-    arimaData <- prepareData()
+    arimaData <- prepareData()$data.ts
     plot_arima_tsdiag(arimaData)
   })
   
@@ -301,7 +305,7 @@ shinyServer(function(input, output) {
       # User has not uploaded a file yet
       return(NULL)
     }
-    arimaData <- prepareData()
+    arimaData <- prepareData()$data.ts
     date_range <- input$radio[1]
     plot_arima(arimaData, date_range)
   })
@@ -313,9 +317,10 @@ shinyServer(function(input, output) {
       # User has not uploaded a file yet
       return(NULL)
     }
-    hmmdata <- prepareData()
-    k <- as.numeric(input$k[1])
-    summary(fit_hmm(hmmdata, k))
+    hmmdata <- prepareData()$data.xts
+    k <- 3
+    res <- fit_hmm(hmmdata, k)
+    summary(res$mod)
   })
   
   #visualise HMM
@@ -326,22 +331,49 @@ shinyServer(function(input, output) {
       # User has not uploaded a file yet
       return(NULL)
     }
-    k = as.numeric(input$k[1])
-    hmmdata <- prepareData()
-    fm <- fit_hmm(hmmdata, k)
-    probs <- posterior(fm)
-    # Lets change the name
-    colnames(probs)[2:(k + 1)] <- paste("S", 1:k, sep = "-")
-    # Create dta.frame
-    dfu <-
-      data.table(cbind(
-        datum = index(hmmdata),
-        net = coredata(hmmdata)[, "net"],
-        probs[, 2:(k + 1)]
-      ))
-    dfm <- melt(dfu[1:100], id.vars = "datum" )
-    ggplot(dfm, aes(datum, value)) + geom_line() +
-      facet_grid(variable ~ ., scales = "free_y") + theme_bw()
+    k = 3
+    hmmdata <- prepareData()$data.xts
+    res <- fit_hmm(hmmdata, k)
+    mod = res$mod
+    vit = res$vit
+    qplot(datum,value,data=vit,geom="line",
+          main = "Hdden Markov Model: Viterbi decoded sequence",
+          ylab = "probability of latent state given observed sequence",xlab="") + 
+      facet_grid(variable ~ ., scales="free_y") + theme_bw()
+  })
+  
+  output$fitGAMM <- renderPrint({
+    if (is.null(input$energy_file) &
+        is.null(input$EAN) &
+        is.null(input$category)) {
+      # User has not uploaded a file yet
+      return(NULL)
+    }
+    df <- prepareData()
+    df.x <- df$data.xts
+    gam.df <- as.data.table(df.x)
+    gam.df[,'week_day'] <- lubridate::wday(gam.df$index, label=FALSE,week_start=1)
+    gam.df[,'hour_of_day'] <- lubridate::hour(gam.df$index)
+    gam.df[,'month'] <- lubridate::month(gam.df$index)
+    res <- fit.gamm(gam.df)
+    summary(res$mod)
+  })
+  
+  #plot GAMM
+  output$house_GAM <- renderPlot({
+    if (is.null(input$energy_file) &
+        is.null(input$EAN) &
+        is.null(input$category)) {
+      # User has not uploaded a file yet
+      return(NULL)
+    }
+    df <- prepareData()
+    df.x <- df$data.xts
+    gam.df <- as.data.table(df.x)
+    gam.df[,'week_day'] <- lubridate::wday(gam.df$index, label=FALSE,week_start=1)
+    gam.df[,'hour_of_day'] <- lubridate::hour(gam.df$index)
+    gam.df[,'month'] <- lubridate::month(gam.df$index)
+    viz.gamm(gam.df)
   })
   
   
@@ -378,38 +410,44 @@ shinyServer(function(input, output) {
       xts(houseWide[, -1], order.by = houseWide$Datum)
     
     if (date_range == "Daily") {
-      energy <- apply.daily(energyxts, FUN=colSums)
-      frequency = 7
-      seasonal.periods=c(7, 365.25)
+      energy <- apply.daily(energyxts, FUN = colSums)
+      frequency = 7 * 365
+      seasonal.periods = c(7)
     }  else if (date_range == "Hourly") {
-      energy <- period.apply(energyxts, endpoints(energyxts, "hours"), colSums)
-      frequency = 24*365
-      seasonal.periods=c(24,168,8766)
+      energy <-
+        period.apply(energyxts, endpoints(energyxts, "hours"), colSums)
+      frequency = 24 * 365
+      seasonal.periods = c(24, 168)
     }  else if (date_range == "Monthly") {
-      energy <- apply.monthly(energyxts, FUN=colSums)
+      energy <- apply.monthly(energyxts, FUN = colSums)
       frequency = 12
-      seasonal.periods=c(12)
-    }  else if(date_range=="15min"){
+      seasonal.periods = c(12)
+    }  else if (date_range == "15min") {
       energy <- energyxts
-      frequency = 60/15*24*365
-      seasonal.periods=c(96,336, 70128)
+      frequency = (60 / 15) * 24 
+      seasonal.periods = c(96, 336)
     }
     
     #arima.xts <- energy
     arima.xts <- energy[, 1] - energy[, 2]
-    colnames(arima.xts) <- "meetwaarde"
+    colnames(arima.xts) <- "Meetwaarde"
     start.year <- year(start(arima.xts))
     start.month <- month(start(arima.xts))
     end.year <- year(end(arima.xts))
     end.month <- month(end(arima.xts))
     start.ts <- c(start.year, start.month)
     end.ts <- c(end.year, end.month)
-    
-    arima.msts <- msts(coredata(arima.xts), 
-                       start = start.ts,
-                       end = end.ts,
-                       seasonal.periods =  seasonal.periods)
-    return(arima.msts)
+    arima.msts <- msts(
+      coredata(arima.xts),
+      start = start.ts,
+      end = end.ts,
+      seasonal.periods =  seasonal.periods
+    )
+    arima.ts <- ts(
+      coredata(arima.xts),
+      frequency = frequency
+    )
+    return(list("data.xts" = arima.xts, "data.ts" = arima.ts))
   })
   
   output$downloadData <- downloadHandler(

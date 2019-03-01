@@ -89,7 +89,7 @@ sidebarLayout(
         "Model",
         tabsetPanel(
           tabPanel(
-            "Arima",  
+            "Auto regressive models",  
             tabsetPanel(
               tabPanel(
                 "Identification",plotOutput("house_arima_acf", width = "95%", height = "720px")%>% withSpinner(color="#000000")
@@ -106,10 +106,16 @@ sidebarLayout(
               )
             )),
           tabPanel(
-            "HMM",  
+            "Hidden Markov models",  
             tabsetPanel(
               tabPanel("Estimation", verbatimTextOutput("fitHMM")%>% withSpinner(color="#000000")),                              
               tabPanel("Inference", plotOutput("house_hmm", width = "95%", height = "720px")%>% withSpinner(color="#000000")
+              ))),
+          tabPanel(
+            "General Additive Mixture Model",  
+            tabsetPanel(
+              tabPanel("Estimation", verbatimTextOutput("fitGAMM")%>% withSpinner(color="#000000")),                              
+              tabPanel("Inference", plotOutput("house_GAM", width = "95%", height = "720px")%>% withSpinner(color="#000000")
               )))
         ))), 
     width =10)
