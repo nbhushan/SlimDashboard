@@ -5,6 +5,7 @@ options(shiny.maxRequestSize = 1024 * 1024 ^ 2)
 # 0. Prepare environment
 
 # 0. Prepare environment ----
+if (FALSE) {
 library(shiny)
 library(ggplot2)
 library(scales)
@@ -13,8 +14,8 @@ library(bit64)
 library(dygraphs)
 library(xts)
 library(shinythemes)
-source("helpers.R")
-
+source("helpers.R", local = TRUE)
+}
 
 shinyServer(function(input, output) {
   #This function is repsonsible for loading in the selected file
@@ -317,10 +318,12 @@ shinyServer(function(input, output) {
       # User has not uploaded a file yet
       return(NULL)
     }
-    hmmdata <- prepareData()$data.xts
-    k <- 3
-    res <- fit_hmm(hmmdata, k)
+    res <- fit.hmm()
     summary(res$mod)
+    if(input$radio[1]!="15min"){
+      print(paste("State durations in units:", input$radio[1], sep = " "))
+    } else{print(paste("State durations in units:", "Hours", sep = " "))}
+    print(res$durations)
   })
   
   #visualise HMM
@@ -331,10 +334,10 @@ shinyServer(function(input, output) {
       # User has not uploaded a file yet
       return(NULL)
     }
-    k = 3
-    hmmdata <- prepareData()$data.xts
-    res <- fit_hmm(hmmdata, k)
-    mod = res$mod
+    #k = as.numeric(input$k)
+    #covariates <- input$hmm_covariate
+    #hmmdata <- prepareData()$data.xts
+    res <- fit.hmm()
     vit = res$vit
     qplot(datum,value,data=vit,geom="line",
           main = "Hdden Markov Model: Viterbi decoded sequence",
@@ -469,6 +472,89 @@ shinyServer(function(input, output) {
       fwrite(as.data.table(prepareData()), file, sep = ";")
     }
   )
+  
+  fit.hmm <- reactive({
+    if (is.null(input$energy_file) &
+        is.null(input$EAN) &
+        is.null(input$category)) {
+      # User has not uploaded a file yet
+      return(NULL)
+    }
+    date_range = input$radio[1]
+    if (date_range == "Daily") {
+      den = 1
+    }    else if (date_range == "Hourly") {
+      den = 1
+    }    else if (date_range == "Monthly") {
+      den = 1
+    }    else if (date_range == "15min") {
+      den = 60/15
+    }  
+    
+    set.seed(7)
+    k = as.numeric(input$k)
+    covariates <- input$hmm_covariate
+    hmmdata <- prepareData()$data.xts
+    gam.df <- as.data.table(hmmdata)
+    gam.df[,'week_day'] <- lubridate::wday(gam.df$index, label=FALSE)
+    gam.df[,'hour_of_day'] <- lubridate::hour(gam.df$index)
+    gam.df[,'month'] <- lubridate::month(gam.df$index)
+    matrix.gam <- data.table(Load = gam.df[, Meetwaarde],
+                             Daily = gam.df[,hour_of_day],
+                             Weekly = gam.df[, week_day],
+                             Month = gam.df[,month])
+    matrix.gam$Daily <- as.factor(matrix.gam$Daily)
+    matrix.gam$Month <- as.factor(matrix.gam$Month)
+    # #kmeans cluster
+    # cl <- kmeans(coredata(energy), k, nstart = 25)
+    # means <- as.vector(cl$centers)
+    # sds <- sqrt(cl$tot.withinss / cl$size)
+    # #Create HMM model
+    # resp_init <- c(rbind(means, sds))
+    #names(energy)<-"Meetwaarde"
+    if (covariates == "none") {
+      mod <-
+        depmix(Load ~ 1,
+               data = matrix.gam,
+               nstates = k
+               #respstart = resp_init
+        )
+    } else {
+      mod <-
+        depmix(
+          Load ~ 1,
+          data = matrix.gam,
+          nstates = k,
+          transition = ~ Daily
+          #respstart = resp_init
+        )
+    }
+    fit.hmm <- fit(mod, verbose = F) #fit
+    #probs <- posterior(fit.hmm)
+    # Lets change the name
+    #colnames(probs)[2:(k + 1)] <- paste("state", 1:k, sep = " ")
+    # Create dta.frame
+    #viterbi sequencing
+    vit <- posterior(fit.hmm)
+    df.viterbi <- data.table(cbind(datum=index(hmmdata),net=matrix.gam$Load, vit))
+    df.viterbi.wide <- melt(df.viterbi[1:500], id.vars = "datum")
+    #compute state durations
+    durations <- matrix(0, nrow = nrow(vit), ncol = k)
+    mean.durations <- list()
+    for (i in c(1:k)) {
+      durations[, i] = ifelse(vit$state == i, 1, 0)
+      t = rle(durations[, i])$lengths
+      mean.durations[[i]] <- mean(t[t != 1]) / den
+    }
+    
+    return(list(
+      "mod" = fit.hmm,
+      "vit" = df.viterbi.wide,
+      "durations" = mean.durations
+    ))
+  }
+  )
+  
   
   function(input, output, session) {
     session$onSessionEnded(function() {

@@ -11,6 +11,7 @@ require(tsbox)
 library(lubridate)
 require(mgcv)
 require(car)
+require(MmgraphR)
 source("helpers.R")
 
 rm(list=ls())
@@ -51,7 +52,7 @@ category <- "Elektra"
     xts(houseWide[,-1], order.by = houseWide$Datum)
   print(periodicity(energyxts))
   
-  date_range = "Hourly"
+  date_range = "15min"
   if (date_range == "Daily") {
     energy <- apply.daily(energyxts, FUN=colSums)
     frequency = 7*365
@@ -74,7 +75,7 @@ category <- "Elektra"
     h=4*24
   }
   print(periodicity(energy))
-  dygraph(energy)
+  #dygraph(energy)
 
   arima.xts <- energy[,1] - energy[,2]
   colnames(arima.xts) <- "Meetwaarde"
@@ -123,63 +124,30 @@ category <- "Elektra"
   gam.df[,'week_day'] <- lubridate::wday(gam.df$index, label=FALSE)
   gam.df[,'hour_of_day'] <- lubridate::hour(gam.df$index)
   gam.df[,'month'] <- lubridate::month(gam.df$index)
-
-
-
-  period <- 24
-  window <- N / period # number of days in the train set
   
+  #you want to map the interval (0,24) to the interval (0,2π) - a full cycle 
+  #https://stats.stackexchange.com/questions/336613/regression-using-circular-variable-hour-from-023-as-predictor
+  hr <- as.numeric(energy$Daily)
+  xhr = sin(2*pi*hr/24)
+  yhr = cos(2*pi*hr/24)
+
   matrix.gam <- data.table(Load = gam.df[, Meetwaarde],
                            Daily = gam.df[,hour_of_day],
                            Weekly = gam.df[, week_day],
                            Month = gam.df[,month])
   
-  gam_1 <- gam(Load ~ s(Daily, bs = "cr", k = period) +
-                 s(Weekly, bs = "ps", k = 7)+
+  gam_1 <- gam(Load ~ s(Daily, bs = "cc", k = 24) +
+                 s(Weekly, bs = "cc", k = 7)+
                  s(Month, bs = "cc", k = 7),
                data = matrix.gam,
                family = gaussian)
-  
-  recode(x, "c(1,2)='A'; 
-	else='B'")
-  matrix.gam <- data.table(Load = gam.df[, Meetwaarde],
-                           Daily = gam.df[,hour_of_day],
-                           Weekly = gam.df[, week_day],
-                           Month = gam.df[,month])
-  
-  layout(matrix(1:3, nrow = 1))
-  plot(gam_1, shade = TRUE)
-  
-  gam_1 <- gam(Load ~ s(Daily, Weekly,Month,
-                         k = c(period, 7, 7),
-                         bs = c("cr", "ps", "cc"),
-                         full = TRUE),
-               data = matrix.gam,
-               family = gaussian)
-  
-  layout(matrix(1:3, nrow = 1))
-  plot(gam_1, shade = TRUE)
 
-  
-  gam_2 <- gam(Load ~ s(Daily, Weekly),
-               data = matrix.gam,
-               family = gaussian)
-  
-  visreg::visreg(gam_1, "Daily", gg = TRUE, ylab="kWh", xlab="Hour of the day" )+theme_bw()
-  
-  gam_6_ar1 <- mgcv::gamm(Load ~ t2(Daily, Weekly,
-                              k = c(period, 7),
-                              bs = c("cr", "ps"),
-                              full = TRUE),
-                    data = matrix.gam,
-                    family = gaussian,
-                    correlation = corARMA(form = ~ 1|Weekly, p = 1),
-                    method = "REML")
-  
-  layout(matrix(1:2, nrow = 1))
+  gam_1$data <- matrix.gam
+  layout(matrix(1:3, nrow = 1))
   plot(gam_1, shade = TRUE)
   
   
+
   
   
   
@@ -194,27 +162,84 @@ category <- "Elektra"
   
   
 #HMM
-  energy <- arima.xts
-  k=2
+  energy <- matrix.gam
+  energy$Daily <- as.factor(energy$Daily)
+  energy$Month <- as.factor(energy$Month)
+  
+  hr <- as.numeric(energy$Daily)
+  xhr = sin(2*pi*hr/24)
+  yhr = cos(2*pi*hr/24)
+
+  k=3
   set.seed(7)
   #kmeans cluster
-  cl <- kmeans(coredata(energy), k, nstart = 25)
+  cl <- kmeans(energy$Load, k, nstart = 25)
   means <- as.vector(cl$centers)
   sds <- sqrt(cl$tot.withinss / cl$size)
   #Create HMM model
   resp_init <- c(rbind(means,sds))
-  names(energy)<-"Meetwaarde"
-  mod <- depmix(Meetwaarde~1, data=energy, nstates=k, respstart = resp_init)
-  fit.hmm <- fit(mod, verbose = F) #fit
-  probs <- posterior(fit.hmm)   
-  vit <- viterbi(fit.hmm)
+  #names(energy)<-"Meetwaarde"
+  
+  mod.0 <- depmix(Load~1, data=energy, nstates=k, respstart = resp_init)
+  mod.1 <- depmix(Load~1, data=energy, nstates=k, transition = ~ Daily, respstart = resp_init)
+  mod.2 <- depmix(Load~1, data=energy, nstates=k, transition = ~ Daily+Month, respstart = resp_init)
+  #fit
+  fit.hmm.0 <- fit(mod.0, verbose = F) #fit
+  fit.hmm.1 <- fit(mod.1, verbose = F) #fit
+  fit.hmm.2 <- fit(mod.2, verbose = F) #fit
+  
+  #plot AIC
+  layout(matrix(1:2, nrow = 1))
+  plot(1:3,c(BIC(fit.hmm.0),BIC(fit.hmm.1),BIC(fit.hmm.2)),ty="b", ylab="BIC")
+  plot(1:3,c(AIC(fit.hmm.0),AIC(fit.hmm.1),AIC(fit.hmm.2)),ty="b", ylab="AIC")
+  
+  #plot transition models
+  trans.mod.1 <- fit.hmm.1@transition
+  trans.mod.1.df <- data.frame(matrix(unlist(trans.mod.1), nrow=24, byrow=T),stringsAsFactors=FALSE)
+  
+  #viterbi
+  vit.0 <- viterbi(fit.hmm.0)
+  vit.1 <- viterbi(fit.hmm.1)
+  vit.2 <- viterbi(fit.hmm.2)
+  
+  #viterbi sequencing
+  post.2 <- viterbi(fit.hmm.2)
+  df.viterbi <- data.table(cbind(datum=index(arima.xts),net=energy$Load, post.2))
+  plot.viterbi.0 <- melt(df.viterbi[1:500], id.vars = "datum")
+  qplot(datum,value,data=plot.viterbi.0,geom="line",
+        main = "HMM",
+        ylab = "") + 
+    facet_grid(variable ~ ., scales="free_y") + theme_bw()
+  
+  #compute state durations
+  post.2 <- viterbi(fit.hmm.2)
+  durations <- matrix(0, nrow=nrow(post.2), ncol=k)
+  mean.durations <- list()
+  for (i in c(1:k)){
+    durations[,i] = ifelse(post.2$state==i,1,0)
+    t = rle(durations[,i])$lengths
+    mean.durations[[i]] <- mean(t[t!=1])/4
+  }
+  print(fit.hmm.2@response)
+  print(mean.durations)
+
+  
+  #vit compare
+  df.vit.compare <- data.table(cbind(datum=index(arima.xts),net=energy$Load, vit.0))
+  plot.viterbi.0 <- melt(df.vit.compare[1:500], id.vars = "datum")
+  qplot(datum,value,data=plot.viterbi.0,geom="line",
+        main = "HMM",
+        ylab = "") + 
+    facet_grid(variable ~ ., scales="free_y") + theme_bw()
+  
   # Lets change the name
   colnames(probs)[2:(k+1)] <- paste("state",1:k, sep=" ")
   # Create dta.frame
   df.posterior <- data.table(cbind(datum=index(energy),net=coredata(energy), probs[,2:(k+1)]))
 
   df.viterbi <- data.table(cbind(datum=index(energy),net=coredata(energy), vit[,2:(k+1)]))
-
+  
+  df.viterbi <- data.table(cbind(datum=index(arima.xts),net=energy$Daily, vit[,2:(k+1)]))
   
   plot.posterior <- melt(dfu[1:100], id.vars = "datum")
   qplot(datum,value,data=dfm,geom="line",
@@ -230,8 +255,7 @@ category <- "Elektra"
     facet_grid(variable ~ ., scales="free_y") + theme_bw()
   
   
-
+  MmgraphR::trmatplot(fit.hmm)
   
   
   
-po
