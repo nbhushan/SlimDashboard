@@ -5,7 +5,6 @@ options(shiny.maxRequestSize = 1024 * 1024 ^ 2)
 # 0. Prepare environment
 
 # 0. Prepare environment ----
-if (FALSE) {
 library(shiny)
 library(ggplot2)
 library(scales)
@@ -15,7 +14,7 @@ library(dygraphs)
 library(xts)
 library(shinythemes)
 source("helpers.R", local = TRUE)
-}
+
 
 shinyServer(function(input, output) {
   #This function is repsonsible for loading in the selected file

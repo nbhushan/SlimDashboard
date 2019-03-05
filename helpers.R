@@ -23,7 +23,7 @@
 # if (length(new.packages))
 #   install.packages(new.packages, repos = "http://cran.us.r-project.org")
 
-if (FALSE) {
+
 library(shiny)
 library(ggplot2) # load ggplot
 library(scales)
@@ -36,7 +36,7 @@ require(wesanderson)
 require(lubridate)
 #library(visreg)
 library(mgcv)
-}
+library(data.table)
 
 dyCrosshair <- function(dygraph,
                         direction = c("both", "horizontal", "vertical")) {
@@ -258,10 +258,19 @@ plot_arima <- function(arima.ts, date_range)
 
 plot_arima_diag <- function(arima.ts, date_range)
 {
+  if (date_range == "Daily") {
+    h = 7
+  }    else if (date_range == "Hourly") {
+    h = 96
+  }    else if (date_range == "Monthly") {
+    h = 2
+  }    else if (date_range == "15min") {
+    h = 96*2
+  }  
   #acf(coredata(energy)[,"net"])
   ar.fit <- fit_arima(arima.ts)
   #arima.ts <- ts_timeSeries(arima.xts)
-  arima.forecast <- forecast(ar.fit, level = c(95), h = 12)
+  arima.forecast <- forecast(ar.fit, level = c(95), h = h)
   all <- cbind(
     actual = arima.ts,
     lwr = arima.forecast$lower,
@@ -302,8 +311,8 @@ plot_arima_tsdiag <- function(energy)
 }
 
 arima_identify <- function(energy) {
-  p1 <- autoplot(acf(energy, plot = FALSE))
-  p2 <- autoplot(pacf(energy, plot = FALSE), ylab = "PACF")
+  p1 <- autoplot(acf(energy, plot = FALSE))+theme_bw()
+  p2 <- autoplot(pacf(energy, plot = FALSE), ylab = "PACF")+theme_bw()
   multiplot(p1, p2, cols = 1)
 }
 

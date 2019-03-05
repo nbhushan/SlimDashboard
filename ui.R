@@ -151,19 +151,10 @@ shinyUI(fluidPage(
         tabPanel("Understand",
                  tabsetPanel(
                    tabPanel(
-                     "Psychological Determinants",
-                     dygraphOutput("dygraph", width = "95%", height = "720px") %>% withSpinner(color =
-                                                                                                 "#000000")
-                   ),
-                   wellPanel(
                      "Psychological determinants",
                      #img(src=paste0(page_name,".png")),
-                     img(src = "www/buurPC.pdf")
-                   ),
-                   tabPanel(
-                     "Distributions",
-                     plotOutput("dygraph_house_box", width = "95%", height = "720px") %>% withSpinner(color =
-                                                                                                        "#000000")
+                     div(img(img(src = "buurPC.png", width="720")), style="text-align: center;")
+                     
                    )
                  ))
       ),
