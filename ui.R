@@ -51,14 +51,14 @@ shinyUI(fluidPage(
         selected = "Daily"
       ),
       
-      # Copy the line below to make a set of select inputs
-      selectInput("k", label = "Number of HMM states",
-                   choices = list(2,3,4),
-                   selected = 3),
-      # Copy the line below to make a checkbox
-      selectInput("hmm_covariate", label = "Covariates on dynamics",
-      choices = list("none", "hour of day", "psychological determinants"),
-                  selected = "none"),
+      # # Copy the line below to make a set of select inputs
+      # selectInput("k", label = "Number of HMM states",
+      #              choices = list(2,3,4),
+      #              selected = 3),
+      # # Copy the line below to make a checkbox
+      # selectInput("hmm_covariate", label = "Covariates on dynamics",
+      # choices = list("none", "hour of day", "psychological determinants"),
+      #             selected = "none"),
       # # Copy the line below to make a checkbox
       # checkboxInput("hmm_random", label = "Random effects", value = FALSE),
       # #Download button
@@ -154,8 +154,19 @@ shinyUI(fluidPage(
                      "Psychological determinants",
                      #img(src=paste0(page_name,".png")),
                      div(img(img(src = "buurPC.png", width="720")), style="text-align: center;")
-                     
-                   )
+                   ),
+                   tabPanel(
+                     "Consumers vs. Prosumers",
+                     #img(src=paste0(page_name,".png")),
+                     #div(img(img(src = "dataSmooth.jpg", width="480")), style="text-align: center;"),
+                     div("Daily electricity patterns", style="text-align: center;"),
+                     div(img(img(src = "M1dailySmooth.jpg", width="480")), style="text-align: center;"),
+                     div("Daily electricity patterns: significant differences", style="text-align: center;"),
+                     div(img(img(src = "M1dailydiff.jpg", width="480")), style="text-align: center;"),
+                     div("Daily patterns depend on the day of the week", style="text-align: center;"),
+                     div(img(img(src = "interaction.jpg", width="960")), style="text-align: center;")
+                     )                 
+                   
                  ))
       ),
       width = 10

@@ -52,7 +52,7 @@ category <- "Elektra"
     xts(houseWide[,-1], order.by = houseWide$Datum)
   print(periodicity(energyxts))
   
-  date_range = "15min"
+  date_range = "Hourly"
   if (date_range == "Daily") {
     energy <- apply.daily(energyxts, FUN=colSums)
     frequency = 7*365
@@ -118,33 +118,58 @@ category <- "Elektra"
 
   
 
-
+  dygraph(arima.xts)
   #GAM
   gam.df <- as.data.table(arima.xts)
   gam.df[,'week_day'] <- lubridate::wday(gam.df$index, label=FALSE)
   gam.df[,'hour_of_day'] <- lubridate::hour(gam.df$index)
   gam.df[,'month'] <- lubridate::month(gam.df$index)
-  
-  #you want to map the interval (0,24) to the interval (0,2π) - a full cycle 
-  #https://stats.stackexchange.com/questions/336613/regression-using-circular-variable-hour-from-023-as-predictor
-  hr <- as.numeric(energy$Daily)
-  xhr = sin(2*pi*hr/24)
-  yhr = cos(2*pi*hr/24)
+  gam.df[,'time'] <- as.numeric(gam.df$index)/1000000
+  gam.df[,'weekend'] <- as.factor(gam.df$week_day>4)
+  gam.df[,'load24'] <- shift(gam.df$Meetwaarde,24)
+  #levels(gam.df$weekend) <- c("weekend","weekday")
 
   matrix.gam <- data.table(Load = gam.df[, Meetwaarde],
                            Daily = gam.df[,hour_of_day],
                            Weekly = gam.df[, week_day],
-                           Month = gam.df[,month])
+                           Month = gam.df[,month],
+                           Time = gam.df[,time],
+                           weekend = gam.df[,weekend],
+                           load24 = gam.df[,load24])
   
-  gam_1 <- gam(Load ~ s(Daily, bs = "cc", k = 24) +
-                 s(Weekly, bs = "cc", k = 7)+
+  gam_1 <- gam(Load ~ load24 + s(Daily, by=weekend, bs = "cc", k = 24) +
                  s(Month, bs = "cc", k = 7),
                data = matrix.gam,
                family = gaussian)
 
-  gam_1$data <- matrix.gam
+  #gam_1$data <- matrix.gam
   layout(matrix(1:3, nrow = 1))
   plot(gam_1, shade = TRUE)
+  
+  layout(matrix(1:2, ncol = 2))
+  acf(resid(gam_1), lag.max = 36, main = "ACF")
+  pacf(resid(gam_1), lag.max = 36, main = "pACF")
+  
+  ar.mod <- auto.arima(resid(gam_1), D=1)
+  
+  
+  gam_1_ar <- gamm(Load ~ load24 +
+                     s(Daily, by=weekend, bs = "cc", k = 24) +
+                    s(Month, bs = "cc", k = 7),
+                  data = matrix.gam,
+                  correlation =corARMA(form = ~ 1, p = 1,q=3),
+                  family = gaussian,
+                  method = "REML")
+  saveRDS(gam_1_ar, "gamARweekendlag24.rds")
+
+  layout(matrix(1:3, nrow = 1))
+  plot(gam_1_ar$gam, shade = TRUE)
+  
+  
+  layout(matrix(1:2,  nrow = 1))
+  acf(resid(gam_1_ar$lme, type = "normalized"), lag.max = 48, main = "ACF")
+  pacf(resid(gam_1_ar$lme, type = "normalized"), lag.max = 48, main = "pACF")
+  
   
   
 

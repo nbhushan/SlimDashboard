@@ -491,8 +491,10 @@ shinyServer(function(input, output) {
     }  
     
     set.seed(7)
-    k = as.numeric(input$k)
-    covariates <- input$hmm_covariate
+    #k = as.numeric(input$k)
+    k=3
+    #covariates <- input$hmm_covariate
+    covariates = "none"
     hmmdata <- prepareData()$data.xts
     gam.df <- as.data.table(hmmdata)
     gam.df[,'week_day'] <- lubridate::wday(gam.df$index, label=FALSE)
